@@ -2,13 +2,15 @@
 
 An internal URL shortener built with **FastAPI + PostgreSQL + Redis**.
 
+![Screenshot](docs/screenshot.png)
+
 ## Features
 
 - Shorten URLs with random, non-sequential short codes (base62)
 - Deduplicate — same long URL always returns the same short code
 - Fast redirects with Redis cache-aside pattern
 - Usage tracking (clicks, referrer, user agent)
-- Simple, dark-mode web UI
+- Premium dark-themed UI with animations and suggestion chips
 
 ## Tech Stack
 
@@ -25,13 +27,19 @@ pip install -r requirements.txt
 
 # Configure environment
 cp .env.example .env
-# Edit .env with your DATABASE_URL and REDIS_URL
+# Edit .env with your DATABASE_URL, REDIS_URL, and BASE_URL
 
 # Run the app
 uvicorn app.main:app --reload
 ```
 
 Open `http://localhost:8000` in your browser.
+
+## Running Tests
+
+```bash
+pytest
+```
 
 ## Project Structure
 
@@ -53,9 +61,11 @@ url_shortener/
 ├── static/
 │   ├── style.css
 │   └── app.js
+├── tests/
+│   ├── conftest.py
+│   ├── test_api.py
+│   ├── test_cache.py
+│   └── test_shortener.py
 ├── requirements.txt
-├── .env.example
-└── doc/
-    ├── requirements.md
-    └── implementation_plan.md
+└── .env.example
 ```
