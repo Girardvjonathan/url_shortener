@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}Snip — URL Shortener{% endblock %}
+{% block content %}
+
+<div class="page-wrapper">
+
+  <!-- Header -->
+  <header class="site-header">
+    <div class="logo">
+      <span class="logo-icon">⚡</span>
+      <span class="logo-text">Snip</span>
+    </div>
+    <nav class="header-nav">
+      <a href="/docs" class="nav-link" target="_blank">API Docs</a>
+    </nav>
+  </header>
+
+  <!-- Hero -->
+  <main class="hero">
+    <div class="hero-glow"></div>
+    <div class="hero-content">
+      <h1 class="hero-title">
+        Shorten any link,<br>
+        <span class="gradient-text">instantly.</span>
+      </h1>
+      <p class="hero-subtitle">Fast, clean, and shareable short URLs — powered by Redis caching.</p>
+
+      <!-- Shorten Form -->
+      <form id="shorten-form" class="shorten-form" novalidate>
+        <div class="input-row">
+          <input
+            id="url-input"
+            type="url"
+            class="url-input"
+            placeholder="Paste a long URL here…"
+            autocomplete="off"
+            spellcheck="false"
+            required
+          />
+          <button type="submit" class="btn-shorten" id="submit-btn">
+            <span class="btn-label">Shorten</span>
+            <span class="btn-spinner" hidden>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+              </svg>
+            </span>
+          </button>
+        </div>
+
+        <p id="input-error" class="input-error-msg" hidden></p>
+
+        <!-- Suggestion Chips -->
+        <div class="chips-row" role="group" aria-label="Quick suggestions">
+          <span class="chips-label">Try:</span>
+          <button type="button" class="chip" data-url="https://github.com">GitHub</button>
+          <button type="button" class="chip" data-url="https://notion.so">Notion</button>
+          <button type="button" class="chip" data-url="https://figma.com">Figma</button>
+          <button type="button" class="chip" data-url="https://youtube.com">YouTube</button>
+          <button type="button" class="chip" data-url="https://linear.app">Linear</button>
+          <button type="button" class="chip" data-url="https://vercel.com">Vercel</button>
+        </div>
+      </form>
+
+      <!-- Result Card -->
+      <div id="result-card" class="result-card" hidden>
+        <div class="result-badge" id="result-badge">New</div>
+        <div class="result-body">
+          <div class="result-label">Your short link</div>
+          <div class="result-link-row">
+            <a id="result-link" href="#" class="result-link" target="_blank" rel="noopener"></a>
+            <button class="btn-copy" id="copy-btn" title="Copy to clipboard">
+              <svg class="icon-copy" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+              </svg>
+              <svg class="icon-check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" hidden>
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+            </button>
+          </div>
+          <div class="result-original" id="result-original"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Recent URLs -->
+  <section class="recent-section">
+    <div class="section-header">
+      <h2 class="section-title">Recent links</h2>
+      <span class="section-count" id="url-count"></span>
+    </div>
+
+    <div id="urls-empty" class="empty-state" hidden>
+      <p>No links shortened yet. Be the first!</p>
+    </div>
+
+    <div class="table-wrapper">
+      <table class="urls-table" id="urls-table" hidden>
+        <thead>
+          <tr>
+            <th>Short link</th>
+            <th>Original URL</th>
+            <th class="col-clicks">Clicks</th>
+            <th class="col-copy"></th>
+          </tr>
+        </thead>
+        <tbody id="urls-tbody"></tbody>
+      </table>
+    </div>
+  </section>
+
+</div>
+{% endblock %}
