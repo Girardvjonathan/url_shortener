@@ -5,6 +5,7 @@ redis[hiredis]
 jinja2
 pydantic-settings
 python-multipart
+aioboto3
 
 # Testing
 pytest

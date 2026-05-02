@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from starlette.testclient import TestClient
@@ -32,7 +32,12 @@ def mock_redis():
 
 
 @pytest.fixture
-def client(mock_pool, mock_redis):
+def mock_dynamo_session():
+    return MagicMock()
+
+
+@pytest.fixture
+def client(mock_pool, mock_redis, mock_dynamo_session):
     from app.main import app
 
     async def fake_create_pool(*a, **kw):
@@ -44,10 +49,14 @@ def client(mock_pool, mock_redis):
     async def fake_init_db(pool):
         pass
 
+    def fake_create_dynamo_session(*a, **kw):
+        return mock_dynamo_session
+
     with (
         patch("app.main.create_pool", fake_create_pool),
         patch("app.main.create_redis", fake_create_redis),
         patch("app.main.init_db", fake_init_db),
+        patch("app.main.create_dynamo_session", fake_create_dynamo_session),
     ):
         with TestClient(app) as c:
             yield c

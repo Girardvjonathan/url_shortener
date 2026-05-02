@@ -8,6 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from app.cache import create_redis
 from app.config import settings
 from app.database import create_pool, init_db
+from app.dynamo import create_dynamo_session
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +27,14 @@ async def lifespan(app: FastAPI):
     logger.info("Connecting to Redis...")
     app.state.redis = await create_redis(settings.redis_url)
     logger.info("Redis connected.")
+
+    logger.info("Setting up DynamoDB session...")
+    app.state.dynamo_session = create_dynamo_session(
+        settings.dynamo_region,
+        settings.aws_access_key_id,
+        settings.aws_secret_access_key,
+    )
+    logger.info("DynamoDB session ready.")
 
     yield
 
@@ -46,7 +55,8 @@ app = FastAPI(
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 
 # Import and include routes (deferred to avoid circular imports)
-from app.routes import api, pages  # noqa: E402
+from app.routes import api, benchmark, pages  # noqa: E402
 
 app.include_router(api.router)
+app.include_router(benchmark.router)
 app.include_router(pages.router)
