@@ -40,12 +40,6 @@ class BenchmarkShortenResult(BaseModel):
     redis_write_error: str | None = None
 
 
-class SeedResult(BaseModel):
-    seeded: int
-    failed: int = 0
-    errors: list[str] = []
-
-
 @router.get("/lookup/{short_code}", response_model=BenchmarkLookupResult)
 async def benchmark_lookup(request: Request, short_code: str):
     """Look up a short code in all three stores and return per-store latency + any errors."""
@@ -162,57 +156,3 @@ async def benchmark_shorten(request: Request, body: CreateURLRequest):
         redis_write_error=redis_write_error,
     )
 
-
-@router.post("/seed", response_model=SeedResult)
-async def benchmark_seed(request: Request):
-    """Copy all URLs from Postgres into DynamoDB. Reports per-item failures."""
-    pool = request.app.state.pool
-    dynamo = request.app.state.dynamo_session
-
-    rows = await pool.fetch("SELECT short_code, full_url FROM urls")
-
-    async def _seed_one(short_code: str, full_url: str) -> None:
-        async with dynamo.resource("dynamodb") as d:
-            table = await d.Table(settings.dynamo_table)
-            await table.put_item(Item={"short_code": short_code, "full_url": full_url})
-
-    results = await asyncio.gather(
-        *[_seed_one(r["short_code"], r["full_url"]) for r in rows],
-        return_exceptions=True,
-    )
-
-    errors = [
-        f"{rows[i]['short_code']}: {results[i]}"
-        for i in range(len(results))
-        if isinstance(results[i], BaseException)
-    ]
-
-    return SeedResult(
-        seeded=len(rows) - len(errors),
-        failed=len(errors),
-        errors=errors,
-    )
-
-
-async def _write_postgres(pool, full_url: str) -> str:
-    existing = await pool.fetchrow(
-        "SELECT short_code FROM urls WHERE full_url = $1", full_url
-    )
-    if existing:
-        return existing["short_code"]
-
-    for _ in range(MAX_RETRIES):
-        unique_id = generate_unique_id()
-        short_code = base62_encode(unique_id)
-        try:
-            await pool.execute(
-                "INSERT INTO urls (id, short_code, full_url) VALUES ($1, $2, $3)",
-                unique_id, short_code, full_url,
-            )
-            return short_code
-        except Exception as e:
-            if "unique" in str(e).lower() or "duplicate" in str(e).lower():
-                continue
-            raise
-
-    raise HTTPException(status_code=503, detail="Failed to generate unique short code")

@@ -13,7 +13,7 @@ Each store is queried independently and results are returned in a single respons
 | DynamoDB | ~231 ms |
 
 This is due to dynamo being the only one outside of the local network. Next tests should instead use
-redis/postgress inside AWS + lambda functions
+redis/postgress inside AWS + lambda functions or EC2
 
 
 
