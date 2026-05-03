@@ -1,4 +1,4 @@
-from __future__ import annotations
+from typing import Optional
 
 from pydantic_settings import BaseSettings
 
@@ -13,8 +13,8 @@ class Settings(BaseSettings):
     # DynamoDB
     dynamo_region: str = "us-east-1"
     dynamo_table: str = "url_shortener"
-    aws_access_key_id: str | None = None
-    aws_secret_access_key: str | None = None
+    aws_access_key_id: Optional[str] = None
+    aws_secret_access_key: Optional[str] = None
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
