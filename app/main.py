@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from app.cache import create_redis
 from app.config import settings
 from app.database import create_pool, init_db
-from app.dynamo import create_dynamo_session
+from app.dynamo import create_dynamo_session, open_dynamo_table
 
 logger = logging.getLogger(__name__)
 
@@ -29,10 +29,13 @@ async def lifespan(app: FastAPI):
     logger.info("Redis connected.")
 
     logger.info("Setting up DynamoDB session...")
-    app.state.dynamo_session = create_dynamo_session(
+    dynamo_session = create_dynamo_session(
         settings.dynamo_region,
         settings.aws_access_key_id,
         settings.aws_secret_access_key,
+    )
+    app.state.dynamo_resource_cm, app.state.dynamo_table = await open_dynamo_table(
+        dynamo_session, settings.dynamo_table
     )
     logger.info("DynamoDB session ready.")
 
@@ -42,6 +45,7 @@ async def lifespan(app: FastAPI):
     logger.info("Closing connections...")
     await app.state.redis.close()
     await app.state.pool.close()
+    await app.state.dynamo_resource_cm.__aexit__(None, None, None)
     logger.info("Connections closed.")
 
 

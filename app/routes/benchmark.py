@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import asyncio
 import logging
 import time
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
-from app.config import settings
+from app.cache import CACHE_TTL
 from app.models import CreateURLRequest
 from app.shortener import base62_encode, generate_unique_id
 
@@ -42,12 +41,29 @@ class BenchmarkShortenResult(BaseModel):
     redis_write_error: str | None = None
 
 
+async def _write_postgres(pool, full_url: str) -> str:
+    for _ in range(MAX_RETRIES):
+        unique_id = generate_unique_id()
+        short_code = base62_encode(unique_id)
+        try:
+            await pool.fetchrow(
+                "INSERT INTO urls (id, short_code, full_url) VALUES ($1, $2, $3) RETURNING created_at",
+                unique_id, short_code, full_url,
+            )
+            return short_code
+        except Exception as e:
+            if "unique" in str(e).lower() or "duplicate" in str(e).lower():
+                continue
+            raise
+    raise RuntimeError("Failed to generate unique short code after multiple attempts")
+
+
 @router.get("/lookup/{short_code}", response_model=BenchmarkLookupResult)
 async def benchmark_lookup(request: Request, short_code: str):
     """Look up a short code in all three stores and return per-store latency + any errors."""
     pool = request.app.state.pool
     redis = request.app.state.redis
-    dynamo = request.app.state.dynamo_session
+    dynamo_table = request.app.state.dynamo_table
 
     # Redis
     redis_url = redis_error = None
@@ -72,11 +88,9 @@ async def benchmark_lookup(request: Request, short_code: str):
     dynamo_url = dynamo_error = None
     t0 = time.perf_counter()
     try:
-        async with dynamo.resource("dynamodb") as d:
-            table = await d.Table(settings.dynamo_table)
-            resp = await table.get_item(Key={"short_code": short_code})
-            item = resp.get("Item")
-            dynamo_url = item["full_url"] if item else None
+        resp = await dynamo_table.get_item(Key={"short_code": short_code})
+        item = resp.get("Item")
+        dynamo_url = item["full_url"] if item else None
     except Exception as e:
         dynamo_error = str(e)
     dynamo_ms = round((time.perf_counter() - t0) * 1000, 3)
@@ -108,7 +122,7 @@ async def benchmark_shorten(request: Request, body: CreateURLRequest):
     """Write a URL to all three stores and return per-store write latency + any errors."""
     pool = request.app.state.pool
     redis = request.app.state.redis
-    dynamo = request.app.state.dynamo_session
+    dynamo_table = request.app.state.dynamo_table
     full_url = str(body.full_url)
 
     # Postgres (source of truth — generates the short_code)
@@ -125,9 +139,7 @@ async def benchmark_shorten(request: Request, body: CreateURLRequest):
     t0 = time.perf_counter()
     if short_code:
         try:
-            async with dynamo.resource("dynamodb") as d:
-                table = await d.Table(settings.dynamo_table)
-                await table.put_item(Item={"short_code": short_code, "full_url": full_url})
+            await dynamo_table.put_item(Item={"short_code": short_code, "full_url": full_url})
         except Exception as e:
             dynamo_write_error = str(e)
     else:
@@ -139,7 +151,6 @@ async def benchmark_shorten(request: Request, body: CreateURLRequest):
     t0 = time.perf_counter()
     if short_code:
         try:
-            from app.cache import CACHE_TTL
             await redis.setex(f"{REDIS_KEY_PREFIX}{short_code}", CACHE_TTL, full_url)
         except Exception as e:
             redis_write_error = str(e)
@@ -157,4 +168,3 @@ async def benchmark_shorten(request: Request, body: CreateURLRequest):
         redis_write_ms=redis_write_ms,
         redis_write_error=redis_write_error,
     )
-
